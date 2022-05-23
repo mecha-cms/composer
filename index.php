@@ -1,6 +1,6 @@
 <?php
 
-namespace MechaCMS\Composer;
+namespace Mecha\Composer;
 
 use Composer\Composer;
 use Composer\IO\IOInterface;
@@ -17,14 +17,11 @@ class Installer extends LibraryInstaller {
         if ('y.' === substr($name, 0, 2)) {
             return 'lot/y/' . substr($name, 2);
         }
-        return 'vendor/' . $name;
-    }
-    public function supports(string $packageType) {
-        return 'mecha-cms/x' === $packageType || 'mecha-cms/y' === $packageType;
+        return parent::getInstallPath($package);
     }
 }
 
-class Plugin implements PluginInterface {
+class InstallerPlugin implements PluginInterface {
     public function activate(Composer $composer, IOInterface $io) {
         $installer = new Installer($io, $composer);
         $composer->getInstallationManager()->addInstaller($installer);

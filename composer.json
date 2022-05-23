@@ -9,33 +9,17 @@
   "autoload": {
     "files": ["index.php"]
   },
-  "description": "Custom installer using Composer.",
+  "description": "Custom installer with Composer.",
   "extra": {
-    "class": "MechaCMS\\Composer\\Plugin"
+    "class": "Mecha\\Composer\\InstallerPlugin"
   },
-  "funding": [
-    {
-      "type": "opencollective",
-      "url": "https://opencollective.com/mecha-cms"
-    },
-    {
-      "type": "other",
-      "url": "https://paypal.me/tatautaufik"
-    }
-  ],
-  "homepage": "https://mecha-cms.com",
   "license": "GPL-3.0-or-later",
   "name": "mecha-cms/composer",
   "require": {
-    "composer-plugin-api": "^1.0"
+    "composer-plugin-api": "*"
   },
   "require-dev": {
-    "composer/composer": "^1.3"
-  },
-  "support": {
-    "docs": "https://mecha-cms.com/reference",
-    "forum": "https://github.com/mecha-cms/mecha/discussions",
-    "issues": "https://github.com/mecha-cms/mecha/issues"
+    "composer/composer": "*"
   },
   "type": "composer-plugin"
 }
