@@ -7,11 +7,13 @@
     }
   ],
   "autoload": {
-    "files": ["index.php"]
+    "psr-4": {
+      "Mecha\\Composer": "src"
+    }
   },
   "description": "Custom installer with Composer.",
   "extra": {
-    "class": "Mecha\\Composer\\InstallerPlugin"
+    "class": "Mecha\\Composer\\Plugin"
   },
   "license": "GPL-3.0-or-later",
   "name": "mecha-cms/composer",
