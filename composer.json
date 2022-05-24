@@ -8,7 +8,7 @@
   ],
   "autoload": {
     "psr-4": {
-      "Mecha\\Composer": "src"
+      "Mecha\\Composer\\": "src/"
     }
   },
   "description": "Custom installer with Composer.",
