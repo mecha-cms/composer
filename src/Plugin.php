@@ -6,6 +6,7 @@ use const DIRECTORY_SEPARATOR;
 use const GLOB_NOSORT;
 use const JSON_UNESCAPED_SLASHES;
 use const JSON_UNESCAPED_UNICODE;
+use const PHP_EOL;
 use const PREG_SPLIT_DELIM_CAPTURE;
 use const PREG_SPLIT_NO_EMPTY;
 use const T_CLOSE_TAG;
@@ -36,6 +37,7 @@ use function is_string;
 use function json_decode;
 use function json_encode;
 use function ltrim;
+use function preg_replace;
 use function preg_split;
 use function rename;
 use function rmdir;
@@ -296,7 +298,12 @@ class Plugin implements PluginInterface, EventSubscriberInterface {
                     file_put_contents($path, $this->minifyJSON(file_get_contents($path)));
                 // Minify `*.php` file(s)
                 } else if ('php' === $v->getExtension()) {
-                    file_put_contents($path, $this->minifyPHP(file_get_contents($path)));
+                    $content = $this->minifyPHP(file_get_contents($path));
+                    if ('state.php' === $n && (false !== strpos($content, '=>function(') || false !== strpos($content, '=>fn('))) {
+                        // Need to add a line-break here because <https://github.com/mecha-cms/mecha/blob/650fcccc13a5c6a2591d523d8f76411a6bdae8fb/engine/f.php#L1268-L1270>
+                        $content = preg_replace('/("(?:[^"\\\]|\\\.)*"|\'(?:[^\'\\\]|\\\.)*\')=>(fn|function)\(/', PHP_EOL . '$1=>$2(', $content);
+                    }
+                    file_put_contents($path, $content);
                 }
             }
         }
