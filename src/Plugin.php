@@ -288,16 +288,20 @@ class Plugin implements PluginInterface, EventSubscriberInterface {
                 false !== strpos($path . DIRECTORY_SEPARATOR, DIRECTORY_SEPARATOR . 'node_modules' . DIRECTORY_SEPARATOR)
             ) {
                 $v->isDir() ? rmdir($path) : unlink($path);
+                continue;
             }
             if ($v->isFile()) {
                 if (isset($files_to_delete[$n = $v->getFilename()])) {
                     unlink($path);
+                    continue;
                 }
                 // Minify `composer.json` and `composer.lock`
                 if ('composer.json' === $n || 'composer.lock' === $n) {
                     file_put_contents($path, $this->minifyJSON(file_get_contents($path)));
+                    continue;
+                }
                 // Minify `*.php` file(s)
-                } else if ('php' === $v->getExtension()) {
+                if ('php' === $v->getExtension()) {
                     $content = $this->minifyPHP(file_get_contents($path));
                     if ('state.php' === $n && (false !== strpos($content, '=>function(') || false !== strpos($content, '=>fn('))) {
                         // Need to add a line-break here because <https://github.com/mecha-cms/mecha/blob/650fcccc13a5c6a2591d523d8f76411a6bdae8fb/engine/f.php#L1268-L1270>
