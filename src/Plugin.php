@@ -234,7 +234,7 @@ class Plugin implements PluginInterface, EventSubscriberInterface {
             '\s*(?:"(?:[^"\\\]|\\\.)*"|\'(?:[^\'\\\]|\\\.)*\')\s*',
             '\s*<\?php echo ',
             ';\?>\s*'
-        ], static function($token, $chop) {
+        ], static function ($token, $chop) {
             if (!$token || ('"' === $token[0] && '"' === substr($token, -1) || "'" === $token[0] && "'" === substr($token, -1))) {
                 return $chop;
             }
@@ -303,7 +303,7 @@ class Plugin implements PluginInterface, EventSubscriberInterface {
                 // Minify `*.php` file(s)
                 if ('php' === $v->getExtension()) {
                     $content = $this->minifyPHP(file_get_contents($path));
-                    if ('state.php' === $n && (false !== strpos($content, '=>function(') || false !== strpos($content, '=>fn('))) {
+                    if ('state.php' === $n && (false !== strpos($content, '=>function (') || false !== strpos($content, '=>fn('))) {
                         // Need to add a line-break here because <https://github.com/mecha-cms/mecha/blob/650fcccc13a5c6a2591d523d8f76411a6bdae8fb/engine/f.php#L1268-L1270>
                         $content = preg_replace('/("(?:[^"\\\]|\\\.)*"|\'(?:[^\'\\\]|\\\.)*\')=>(fn|function)\(/', PHP_EOL . '$1=>$2(', $content);
                     }
