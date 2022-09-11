@@ -7,14 +7,19 @@ use const GLOB_NOSORT;
 use const JSON_UNESCAPED_SLASHES;
 use const JSON_UNESCAPED_UNICODE;
 use const PHP_EOL;
+use const PHP_VERSION;
 use const PREG_SPLIT_DELIM_CAPTURE;
 use const PREG_SPLIT_NO_EMPTY;
 use const T_CLOSE_TAG;
+use const T_CLOSE_TAG;
 use const T_COMMENT;
 use const T_CONSTANT_ENCAPSED_STRING;
+use const T_DNUMBER;
 use const T_DOC_COMMENT;
+use const T_ECHO;
 use const T_ENCAPSED_AND_WHITESPACE;
 use const T_END_HEREDOC;
+use const T_IF;
 use const T_INLINE_HTML;
 use const T_OPEN_TAG;
 use const T_OPEN_TAG_WITH_ECHO;
@@ -46,8 +51,10 @@ use function strpos;
 use function strtr;
 use function substr;
 use function token_get_all;
+use function token_name;
 use function trim;
 use function unlink;
+use function version_compare;
 
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
@@ -72,177 +79,165 @@ class Plugin implements PluginInterface, EventSubscriberInterface {
     // Based on <https://github.com/mecha-cms/x.minify>
     private function minifyPHP(string $content, int $comment = 2, int $quote = 1) {
         $out = "";
-        $t = [];
-        // White-space(s) around these token(s) can be removed :)
-        foreach ([
-            'AND_EQUAL',
-            'ARRAY_CAST',
-            'BOOLEAN_AND',
-            'BOOLEAN_OR',
-            'BOOL_CAST',
-            'COALESCE',
-            'CONCAT_EQUAL',
-            'DEC',
-            'DIV_EQUAL',
-            'DOLLAR_OPEN_CURLY_BRACES',
-            'DOUBLE_ARROW',
-            'DOUBLE_CAST',
-            'DOUBLE_COLON',
-            'INC',
-            'INT_CAST',
-            'IS_EQUAL',
-            'IS_GREATER_OR_EQUAL',
-            'IS_IDENTICAL',
-            'IS_NOT_EQUAL',
-            'IS_NOT_IDENTICAL',
-            'IS_SMALLER_OR_EQUAL',
-            'MINUS_EQUAL',
-            'MOD_EQUAL',
-            'MUL_EQUAL',
-            'OBJECT_OPERATOR',
-            'OR_EQUAL',
-            'PAAMAYIM_NEKUDOTAYIM',
-            'PLUS_EQUAL',
-            'POW',
-            'POW_EQUAL',
-            'SL',
-            'SL_EQUAL',
-            'SPACESHIP',
-            'SR',
-            'SR_EQUAL',
-            'STRING_CAST',
-            'XOR_EQUAL'
-        ] as $v) {
-            if (defined($v = 'T_' . $v)) {
-                $t[constant($v)] = 1;
+        $tokens = token_get_all($in);
+        foreach ($tokens as $k => $v) {
+            // Peek previous token
+            if (is_array($prev = $tokens[$k - 1] ?? "")) {
+                $prev = $prev[1];
             }
-        }
-        $c = count($toks = token_get_all($content));
-        $doc = $skip = false;
-        $start = $end = null;
-        for ($i = 0; $i < $c; ++$i) {
-            $tok = $toks[$i];
-            if (is_array($tok)) {
-                $id = $tok[0];
-                $token = $tok[1];
-                if (T_INLINE_HTML === $id) {
-                    $out .= $token;
-                    $skip = false;
-                } else {
-                    if (T_OPEN_TAG === $id) {
-                        $out .= rtrim($token) . ' ';
-                        $start = T_OPEN_TAG;
-                        $skip = true;
-                    } else if (T_OPEN_TAG_WITH_ECHO === $id) {
-                        $out .= $token;
-                        $start = T_OPEN_TAG_WITH_ECHO;
-                        $skip = true;
-                    } else if (T_CLOSE_TAG === $id) {
-                        if (T_OPEN_TAG_WITH_ECHO === $start) {
-                            $out = rtrim($out, '; ');
-                        } else {
-                            $token = ' ' . $token;
-                        }
-                        $out .= trim($token);
-                        $start = null;
-                        $skip = false;
-                    } else if (isset($t[$id])) {
-                        $out .= $token;
-                        $skip = true;
-                    } else if (T_ENCAPSED_AND_WHITESPACE === $id || T_CONSTANT_ENCAPSED_STRING === $id) {
-                        if ('"' === $token[0]) {
-                            $token = addcslashes($token, "\n\r\t");
-                        }
-                        $out .= $token;
-                        $skip = true;
-                    } else if (T_WHITESPACE === $id) {
-                        $n = $toks[$i + 1] ?? null;
-                        if (!$skip && (!is_string($n) || '$' === $n) && !isset($t[$n[0]])) {
-                            $out .= ' ';
-                        }
-                        $skip = false;
-                    } else if (T_START_HEREDOC === $id) {
-                        $out .= "<<<" . ("'" === $token[3] ? "'S'" : 'S') . "\n";
-                        $skip = false;
-                        $doc = true; // Enter (HERE/NOW)DOC
-                    } else if (T_END_HEREDOC === $id) {
-                        $out .= "S\n";
-                        $skip = true;
-                        $doc = false; // Exit (HERE/NOW)DOC
-                        for ($j = $i + 1; $j < $c; ++$j) {
-                            if (is_string($v = $toks[$j])) {
-                                $out .= $v;
-                                if (';' === $v || ',' === $v) {
-                                    if ("\nS\n" . $v === substr($out, -4)) {
-                                        $out = rtrim($out, "\n" . $v) . $v;
-                                        // Prior to PHP 7.3.0, it is very important to note that the line with the closing
-                                        // identifier must contain no other characters, except a semicolon (`;`). That means
-                                        // especially that the identifier may not be indented, and there may not be any
-                                        // spaces or tabs before or after the semicolon. It's also important to realize that
-                                        // the first character before the closing identifier must be a newline as defined by
-                                        // the local operating system. This is `\n` on UNIX systems, including macOS. The
-                                        // closing delimiter must also be followed by a newline.
-                                        //
-                                        // <https://www.php.net/manual/en/language.types.string.php#language.types.string.syntax.heredoc>
-                                        if (';' === $v) {
-                                            $out .= "\n";
-                                        }
-                                    }
-                                    $i = $j;
-                                    break;
-                                }
-                            } else if (T_CLOSE_TAG === $v[0]) {
-                                break;
-                            } else {
-                                $out .= trim($v[1]);
-                            }
-                        }
-                    } else if (T_COMMENT === $id || T_DOC_COMMENT === $id) {
-                        if (
-                            1 === $comment || (
-                                2 === $comment && (
-                                    // Detect special comment(s) from the third character
-                                    // It should be a `!` or `*` → `/*! keep */` or `/** keep */`
-                                    !empty($token[2]) && false !== strpos('!*', $token[2]) ||
-                                    // Detect license comment(s) from the content
-                                    // It should contains character(s) like `@license`
-                                    false !== strpos($token, '@licence') || // noun
-                                    false !== strpos($token, '@license') || // verb
-                                    false !== strpos($token, '@preserve')
-                                )
+            // Peek next token
+            if (is_array($next = $tokens[$k + 1] ?? "")) {
+                $next = $next[1];
+            }
+            if (is_array($v)) {
+                if (T_COMMENT === $v[0] || T_DOC_COMMENT === $v[0]) {
+                    if (
+                        // Keep comment
+                        1 === $comment || (
+                            // Keep comment with condition(s)
+                            2 === $comment && (
+                                // Detect special comment from the third character
+                                // It should be a `!` or `*` → `/*! keep */` or `/** keep */`
+                                !empty($v[1][2]) && false !== strpos('!*', $v[1][2]) ||
+                                // Detect license comment from the content
+                                // It should contains character(s) like `@license`
+                                false !== strpos($v[1], '@licence') || // noun
+                                false !== strpos($v[1], '@license') || // verb
+                                false !== strpos($v[1], '@preserve')
                             )
-                        ) {
-                            $token = ltrim(substr($token, 2, -2), '!*');
-                            $out .= '/*' . trim(strtr($token, ['@preserve' => ""])) . '*/';
-                        }
-                        $skip = true;
-                    } else {
-                        $out .= $token;
-                        $skip = false;
+                        )
+                    ) {
+                        $v[1] = ltrim(substr($v[1], 2, -2), '!*');
+                        $out .= '/*' . trim(strtr($v[1], ['@preserve' => ""])) . '*/';
+                        continue;
+                    }
+                    // Remove comment
+                    continue;
+                }
+                if (T_CLOSE_TAG === $v[0]) {
+                    // <https://www.php.net/manual/en/language.basic-syntax.instruction-separation.php>
+                    if ("" === $next) {
+                        continue; // Remove the last PHP closing tag
+                    }
+                    if (';' === substr($out, -1)) {
+                        $out = substr($out, 0, -1); // Remove the last semi-colon before PHP closing tag
                     }
                 }
-                $end = "";
-            } else {
-                if (false === strpos(';:', $tok) || $end !== $tok) {
-                    $out .= $tok;
-                    $end = $tok;
+                if (T_OPEN_TAG === $v[0]) {
+                    $out .= rtrim($v[1]) . ' ';
+                    continue;
                 }
-                $skip = true;
+                if (T_ECHO === $v[0]) {
+                    if ('<?php ' === substr($out, -6)) {
+                        $out = substr($out, 0, -4) . '='; // Replace `<?php echo` with `<?=`
+                        continue;
+                    }
+                }
+                if (T_IF === $v[0]) {
+                    if ('else ' === substr($out, -5)) {
+                        $out = substr($out, 0, -1) . 'if'; // Replace `else if` with `elseif`
+                        continue;
+                    }
+                }
+                if (T_DNUMBER === $v[0]) {
+                    if (0 === strpos($v[1], '0.')) {
+                        $v[1] = substr($v[1], 1); // Replace `0.` prefix with `.` from float
+                    }
+                    $v[1] = rtrim(rtrim($v[1], '0'), '.'); // Remove trailing `.0` from float
+                    $out .= $v[1];
+                    continue;
+                }
+                if (T_START_HEREDOC === $v[0]) {
+                    $out .= '<<<' . ("'" === $v[1][3] ? "'S'" : 'S') . "\n";
+                    continue;
+                }
+                if (T_END_HEREDOC === $v[0]) {
+                    $out .= 'S';
+                    // Prior to PHP 7.3.0, it is very important to note that the line with the closing identifier must
+                    // contain no other character(s), except a semicolon (`;`). That means especially that the identifier
+                    // may not be indented, and there may not be any space(s) or tab(s) before or after the semicolon.
+                    // It’s also important to realize that the first character before the closing identifier must be a
+                    // new-line as defined by the local operating system. This is `\n` on UNIX system(s), including macOS.
+                    // The closing delimiter must also be followed by a new-line.
+                    //
+                    // <https://www.php.net/manual/en/language.types.string.php#language.types.string.syntax.heredoc>
+                    // if (version_compare(PHP_VERSION, '7.3.0') < 0) {
+                        if (';' === $next) {
+                            if (is_array($tokens[$k + 1])) {
+                                $tokens[$k + 1][1] .= "\n";
+                            } else {
+                                $tokens[$k + 1] .= "\n";
+                            }
+                            continue;
+                        }
+                        if (',' !== $next) {
+                            $out .= "\n";
+                            continue;
+                        }
+                    // }
+                    continue;
+                }
+                if (T_CONSTANT_ENCAPSED_STRING === $v[0] || T_ENCAPSED_AND_WHITESPACE === $v[0]) {
+                    $out .= $v[1];
+                    continue;
+                }
+                // Any type cast
+                if (0 === strpos($v[1], '(') && ')' === substr($v[1], -1) && '_CAST' === substr(token_name($v[0]), -5)) {
+                    $out .= '(' . trim(substr($v[1], 1, -1)) . ')'; // Remove white-space after `(` and before `)`
+                    continue;
+                }
+                if (T_WHITESPACE === $v[0]) {
+                    if (!$next || !$prev) {
+                        continue;
+                    }
+                    if (' ' === substr($out, -1)) {
+                        continue; // Has been followed by single space, skip!
+                    }
+                    // Check if previous or next token contains only punctuation mark(s). White-space around this
+                    // token usually safe to be removed. They must be PHP operator(s) like `&&` and `||`.
+                    // Of course, they can also be present in comment and string, but we already filtered them.
+                    if (
+                        (function_exists('ctype_punct') && ctype_punct($next) || preg_match('/^\p{P}$/', $next)) ||
+                        (function_exists('ctype_punct') && ctype_punct($prev) || preg_match('/^\p{P}$/', $prev))
+                    ) {
+                        // `_` is a punctuation but it can be used to name a valid constant, function and property
+                        if ('_' === $next) {
+                            $out .= ' ';
+                            continue;
+                        }
+                        continue;
+                    }
+                    // Check if previous or next token is a comment, then remove white-space around it!
+                    if (
+                        0 === strpos($next, '#') ||
+                        0 === strpos($prev, '#') ||
+                        0 === strpos($next, '//') ||
+                        0 === strpos($prev, '//') ||
+                        '/*' === substr($next, 0, 2) && '*/' === substr($next, -2) ||
+                        '/*' === substr($prev, 0, 2) && '*/' === substr($prev, -2)
+                    ) {
+                        continue;
+                    }
+                    // Remove white-space after type cast
+                    if (0 === strpos($prev, '(') && ')' === substr($prev, -1) && preg_match('/^\(\s*[^()\s]+\s*\)$/', $prev)) {
+                        continue;
+                    }
+                    // Remove white-space after short echo
+                    if ('<?=' === substr($out, -3)) {
+                        continue;
+                    }
+                    // Convert multiple white-space to single space
+                    $out .= ' ';
+                }
+                $out .= ("" === trim($v[1]) ? "" : $v[1]);
+                continue;
             }
+            // Remove trailing `,`
+            if (',' === substr($out, -1) && false !== strpos(')]}', $v)) {
+                $out = substr($out, 0, -1);
+            }
+            $out .= ("" === trim($v) ? "" : $v);
         }
-        $out = $this->tokens([
-            '\s*(?:"(?:[^"\\\]|\\\.)*"|\'(?:[^\'\\\]|\\\.)*\')\s*',
-            '\s*<\?php echo ',
-            ';\?>\s*'
-        ], static function ($token, $chop) {
-            if (!$token || ('"' === $token[0] && '"' === substr($token, -1) || "'" === $token[0] && "'" === substr($token, -1))) {
-                return $chop;
-            }
-            return strtr($chop, [
-                '<?php echo ' => '<?=',
-                ';?>' => '?>'
-            ]);
-        }, $out);
         return $out;
     }
     private function tokens(array $tokens, callable $fn = null, string $in = null, string $flag = 'i') {
