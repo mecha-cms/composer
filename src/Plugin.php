@@ -66,7 +66,7 @@ class Plugin implements PluginInterface, EventSubscriberInterface {
         return json_encode(json_decode($content), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     }
     // Based on <https://github.com/mecha-cms/x.minify>
-    private function minifyPHP(string $content, int $comment = 2, int $quote = 1) {
+    private function minifyPHP(string $in, int $comment = 2, int $quote = 1) {
         $out = "";
         $tokens = token_get_all($in);
         foreach ($tokens as $k => $v) {
