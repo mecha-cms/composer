@@ -8,6 +8,7 @@ use const JSON_UNESCAPED_SLASHES;
 use const JSON_UNESCAPED_UNICODE;
 use const PHP_EOL;
 use const PHP_VERSION;
+use const T_CASE;
 use const T_CLOSE_TAG;
 use const T_COMMENT;
 use const T_CONSTANT_ENCAPSED_STRING;
@@ -18,6 +19,7 @@ use const T_ENCAPSED_AND_WHITESPACE;
 use const T_END_HEREDOC;
 use const T_IF;
 use const T_OPEN_TAG;
+use const T_RETURN;
 use const T_START_HEREDOC;
 use const T_WHITESPACE;
 
@@ -122,6 +124,10 @@ class Plugin implements PluginInterface, EventSubscriberInterface {
                         continue;
                     }
                 }
+                if (T_CASE === $v[0] || T_RETURN === $v[0]) {
+                    $out .= $v[1] . ' ';
+                    continue;
+                }
                 if (T_IF === $v[0]) {
                     if ('else ' === substr($out, -5)) {
                         $out = substr($out, 0, -1) . 'if'; // Replace `else if` with `elseif`
@@ -176,7 +182,7 @@ class Plugin implements PluginInterface, EventSubscriberInterface {
                     continue;
                 }
                 if (T_WHITESPACE === $v[0]) {
-                    if (!$next || !$prev) {
+                    if ("" === $next || "" === $prev) {
                         continue;
                     }
                     if (' ' === substr($out, -1)) {
@@ -186,8 +192,8 @@ class Plugin implements PluginInterface, EventSubscriberInterface {
                     // token usually safe to be removed. They must be PHP operator(s) like `&&` and `||`.
                     // Of course, they can also be present in comment and string, but we already filtered them.
                     if (
-                        (function_exists('ctype_punct') && ctype_punct($next) || preg_match('/^\p{P}$/', $next)) ||
-                        (function_exists('ctype_punct') && ctype_punct($prev) || preg_match('/^\p{P}$/', $prev))
+                        (function_exists("\\ctype_punct") && \ctype_punct($next) || preg_match('/^\p{P}$/', $next)) ||
+                        (function_exists("\\ctype_punct") && \ctype_punct($prev) || preg_match('/^\p{P}$/', $prev))
                     ) {
                         // `_` is a punctuation but it can be used to name a valid constant, function and property
                         if ('_' === $next) {
@@ -224,6 +230,11 @@ class Plugin implements PluginInterface, EventSubscriberInterface {
             // Remove trailing `,`
             if (',' === substr($out, -1) && false !== strpos(')]}', $v)) {
                 $out = substr($out, 0, -1);
+            }
+            if ('case ' === substr($out, -5) || 'return ' === substr($out, -7)) {
+                if ($v && false !== strpos('([', $v[0])) {
+                    $out = substr($out, 0, -1);
+                }
             }
             $out .= ("" === trim($v) ? "" : $v);
         }
