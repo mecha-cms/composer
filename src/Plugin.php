@@ -8,9 +8,6 @@ use const JSON_UNESCAPED_SLASHES;
 use const JSON_UNESCAPED_UNICODE;
 use const PHP_EOL;
 use const PHP_VERSION;
-use const PREG_SPLIT_DELIM_CAPTURE;
-use const PREG_SPLIT_NO_EMPTY;
-use const T_CLOSE_TAG;
 use const T_CLOSE_TAG;
 use const T_COMMENT;
 use const T_CONSTANT_ENCAPSED_STRING;
@@ -20,30 +17,22 @@ use const T_ECHO;
 use const T_ENCAPSED_AND_WHITESPACE;
 use const T_END_HEREDOC;
 use const T_IF;
-use const T_INLINE_HTML;
 use const T_OPEN_TAG;
-use const T_OPEN_TAG_WITH_ECHO;
 use const T_START_HEREDOC;
 use const T_WHITESPACE;
 
-use function addcslashes;
-use function array_shift;
 use function basename;
-use function constant;
 use function count;
-use function defined;
 use function dirname;
 use function file_get_contents;
 use function file_put_contents;
 use function glob;
-use function implode;
 use function is_array;
 use function is_string;
 use function json_decode;
 use function json_encode;
 use function ltrim;
 use function preg_replace;
-use function preg_split;
 use function rename;
 use function rmdir;
 use function rtrim;
@@ -237,25 +226,6 @@ class Plugin implements PluginInterface, EventSubscriberInterface {
                 $out = substr($out, 0, -1);
             }
             $out .= ("" === trim($v) ? "" : $v);
-        }
-        return $out;
-    }
-    private function tokens(array $tokens, callable $fn = null, string $in = null, string $flag = 'i') {
-        if ("" === ($in = trim($in))) {
-            return "";
-        }
-        $pattern = strtr('(?:' . implode(')|(?:', $tokens) . ')', ['/' => "\\/"]);
-        $chops = preg_split('/(' . $pattern . ')/' . $flag, $in, -1, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY);
-        if (!$fn) {
-            return $chops;
-        }
-        $out = "";
-        while ($chops) {
-            $chop = array_shift($chops);
-            if ("" === ($token = trim($chop))) {
-                continue;
-            }
-            $out .= $fn($token, $chop);
         }
         return $out;
     }
