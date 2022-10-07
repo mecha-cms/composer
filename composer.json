@@ -1,8 +1,8 @@
 {
   "authors": [
     {
-      "name": "Taufik Nurrohman",
       "homepage": "https://github.com/taufik-nurrohman",
+      "name": "Taufik Nurrohman",
       "role": "Developer"
     }
   ],
@@ -11,7 +11,7 @@
       "Mecha\\Composer\\": "src/"
     }
   },
-  "description": "Custom installer with Composer.",
+  "description": "Custom installer using Composer.",
   "extra": {
     "class": "Mecha\\Composer\\Plugin"
   },
