@@ -196,7 +196,7 @@ class Plugin implements PluginInterface, EventSubscriberInterface {
     }
     public function deactivate(Composer $composer, IOInterface $io) {}
     public function onPostCreateProject(Event $event) {
-        $r = \dirname($event->getComposer()->getConfig()->get('vendor-dir'), 2);
+        $r = $event->getComposer()->getConfig()->get('vendor-dir');
         $dir = new \RecursiveDirectoryIterator($r, \RecursiveDirectoryIterator::SKIP_DOTS);
         $files = new \RecursiveIteratorIterator($dir, \RecursiveIteratorIterator::CHILD_FIRST);
         $files_to_delete = [
