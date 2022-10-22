@@ -13,7 +13,7 @@
   },
   "description": "Custom installer using Composer.",
   "extra": {
-    "class": "Mecha\\Composer\\Plugin"
+    "class": "Mecha\\Composer\\PluginTest"
   },
   "license": "GPL-3.0-or-later",
   "name": "mecha-cms/composer",
