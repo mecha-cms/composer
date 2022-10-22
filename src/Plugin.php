@@ -208,15 +208,6 @@ class Plugin implements PluginInterface, EventSubscriberInterface {
         ];
         foreach ($files as $v) {
             $path = $v->getRealPath();
-            if (
-                false !== \strpos($path . \DIRECTORY_SEPARATOR, \DIRECTORY_SEPARATOR . '.factory' . \DIRECTORY_SEPARATOR) ||
-                false !== \strpos($path . \DIRECTORY_SEPARATOR, \DIRECTORY_SEPARATOR . '.git' . \DIRECTORY_SEPARATOR) ||
-                false !== \strpos($path . \DIRECTORY_SEPARATOR, \DIRECTORY_SEPARATOR . '.github' . \DIRECTORY_SEPARATOR) ||
-                false !== \strpos($path . \DIRECTORY_SEPARATOR, \DIRECTORY_SEPARATOR . 'node_modules' . \DIRECTORY_SEPARATOR)
-            ) {
-                $v->isDir() ? \rmdir($path) : \unlink($path);
-                continue;
-            }
             if ($v->isFile()) {
                 if (isset($files_to_delete[$n = $v->getFilename()])) {
                     \unlink($path);
@@ -236,6 +227,15 @@ class Plugin implements PluginInterface, EventSubscriberInterface {
                     }
                     \file_put_contents($path, $content);
                 }
+            }
+            if (
+                false !== \strpos($path . \DIRECTORY_SEPARATOR, \DIRECTORY_SEPARATOR . '.factory' . \DIRECTORY_SEPARATOR) ||
+                false !== \strpos($path . \DIRECTORY_SEPARATOR, \DIRECTORY_SEPARATOR . '.git' . \DIRECTORY_SEPARATOR) ||
+                false !== \strpos($path . \DIRECTORY_SEPARATOR, \DIRECTORY_SEPARATOR . '.github' . \DIRECTORY_SEPARATOR) ||
+                false !== \strpos($path . \DIRECTORY_SEPARATOR, \DIRECTORY_SEPARATOR . 'node_modules' . \DIRECTORY_SEPARATOR)
+            ) {
+                $v->isDir() ? \rmdir($path) : \unlink($path);
+                continue;
             }
         }
     }
