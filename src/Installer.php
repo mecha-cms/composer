@@ -5,7 +5,7 @@ namespace Mecha\Composer;
 use Composer\Installer\LibraryInstaller;
 use Composer\Package\PackageInterface;
 
-class InstallerTest extends LibraryInstaller {
+class Installer extends LibraryInstaller {
     public function getInstallPath(PackageInterface $package) {
         $name = \basename($package->getPrettyName());
         if ('x.' === \substr($name, 0, 2)) {

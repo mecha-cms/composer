@@ -14,7 +14,7 @@ use Composer\Plugin\PluginInterface;
 use Composer\Script\Event;
 use Composer\Script\ScriptEvents;
 
-class PluginTest implements PluginInterface, EventSubscriberInterface {
+class Plugin implements PluginInterface, EventSubscriberInterface {
     private $installer;
     private function minifyJSON(string $in) {
         return \json_encode(\json_decode($in), \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE);
@@ -192,7 +192,7 @@ class PluginTest implements PluginInterface, EventSubscriberInterface {
         return $out;
     }
     public function activate(Composer $composer, IOInterface $io) {
-        $composer->getInstallationManager()->addInstaller($this->installer = new InstallerTest($io, $composer));
+        $composer->getInstallationManager()->addInstaller($this->installer = new Installer($io, $composer));
     }
     public function deactivate(Composer $composer, IOInterface $io) {}
     public function onPostCreateProject(Event $event) {
