@@ -197,7 +197,7 @@ if (!\class_exists(__NAMESPACE__ . "\\Plugin")) {
         }
         public function deactivate(Composer $composer, IOInterface $io) {}
         public function onPostCreateProject(Event $event) {
-            $r = $event->getComposer()->getConfig()->get('vendor-dir');
+            $r = \dirname($event->getComposer()->getConfig()->get('vendor-dir'), 2);
             $dir = new \RecursiveDirectoryIterator($r, \RecursiveDirectoryIterator::SKIP_DOTS);
             $files = new \RecursiveIteratorIterator($dir, \RecursiveIteratorIterator::CHILD_FIRST);
             $files_to_delete = [
