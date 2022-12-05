@@ -239,6 +239,9 @@ class Plugin implements PluginInterface, EventSubscriberInterface {
             }
         }
     }
+    public function onPostInstall(Event $event) {
+        return $this->onPostCreateProject($event);
+    }
     public function onPostPackageInstall(PackageEvent $event) {
         $name = \basename(($package = $event->getOperation()->getPackage())->getName());
         $r = \dirname($event->getComposer()->getConfig()->get('vendor-dir'), 2);
@@ -261,9 +264,10 @@ class Plugin implements PluginInterface, EventSubscriberInterface {
     public function uninstall(Composer $composer, IOInterface $io) {}
     public static function getSubscribedEvents() {
         return [
+            PackageEvents::POST_PACKAGE_INSTALL => 'onPostPackageInstall',
             ScriptEvents::POST_CREATE_PROJECT_CMD => 'onPostCreateProject',
-            ScriptEvents::POST_UPDATE_CMD => 'onPostUpdate',
-            PackageEvents::POST_PACKAGE_INSTALL => 'onPostPackageInstall'
+            ScriptEvents::POST_INSTALL_CMD => 'onPostInstall',
+            ScriptEvents::POST_UPDATE_CMD => 'onPostUpdate'
         ];
     }
 }
