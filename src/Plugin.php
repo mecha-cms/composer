@@ -261,9 +261,9 @@ class Plugin implements PluginInterface, EventSubscriberInterface {
     public function uninstall(Composer $composer, IOInterface $io) {}
     public static function getSubscribedEvents() {
         return [
-            PackageEvents::POST_PACKAGE_INSTALL => 'onPostPackageInstall',
             ScriptEvents::POST_CREATE_PROJECT_CMD => 'onPostCreateProject',
-            ScriptEvents::POST_UPDATE_CMD => 'onPostUpdate'
+            ScriptEvents::POST_UPDATE_CMD => 'onPostUpdate',
+            PackageEvents::POST_PACKAGE_INSTALL => 'onPostPackageInstall'
         ];
     }
 }
