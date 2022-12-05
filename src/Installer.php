@@ -1,6 +1,6 @@
 <?php
 
-namespace Mecha\Composer;
+namespace Mecha\Composer\Test;
 
 use Composer\Installer\LibraryInstaller;
 use Composer\Package\PackageInterface;
