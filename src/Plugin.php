@@ -194,7 +194,7 @@ class Plugin implements PluginInterface, EventSubscriberInterface {
         $composer->getInstallationManager()->addInstaller($this->installer = new Installer($io, $composer));
     }
     public function deactivate(Composer $composer, IOInterface $io) {}
-    public function onPostCreateProject(Event $event) {
+    public function minify(Event $event) {
         $r = \dirname($event->getComposer()->getConfig()->get('vendor-dir'), 2);
         $dir = new \RecursiveDirectoryIterator($r, \RecursiveDirectoryIterator::SKIP_DOTS);
         $files = new \RecursiveIteratorIterator($dir, \RecursiveIteratorIterator::CHILD_FIRST);
@@ -238,8 +238,11 @@ class Plugin implements PluginInterface, EventSubscriberInterface {
             }
         }
     }
+    public function onPostCreateProject(Event $event) {
+        return $this->minify($event);
+    }
     public function onPostInstall(Event $event) {
-        return $this->onPostCreateProject($event);
+        return $this->minify($event);
     }
     public function onPostPackageInstall(PackageEvent $event) {
         $name = \basename(($package = $event->getOperation()->getPackage())->getName());
@@ -258,7 +261,7 @@ class Plugin implements PluginInterface, EventSubscriberInterface {
         }
     }
     public function onPostUpdate(Event $event) {
-        return $this->onPostCreateProject($event);
+        return $this->minify($event);
     }
     public function uninstall(Composer $composer, IOInterface $io) {}
     public static function getSubscribedEvents() {
