@@ -8,12 +8,12 @@
   ],
   "autoload": {
     "psr-4": {
-      "Mecha\\ComposerTest\\": "src/"
+      "Mecha\\Composer\\": "src/"
     }
   },
   "description": "Custom installer using Composer.",
   "extra": {
-    "class": "Mecha\\ComposerTest\\Plugin",
+    "class": "Mecha\\Composer\\Plugin",
     "plugin-modifies-install-path": true
   },
   "license": "GPL-3.0-or-later",

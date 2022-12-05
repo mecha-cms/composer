@@ -1,6 +1,6 @@
 <?php
 
-namespace Mecha\ComposerTest;
+namespace Mecha\Composer;
 
 use Composer\Composer;
 use Composer\EventDispatcher\EventSubscriberInterface;
