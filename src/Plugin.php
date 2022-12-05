@@ -11,6 +11,8 @@ use Composer\Plugin\PluginInterface;
 use Composer\Script\Event;
 use Composer\Script\ScriptEvents;
 
+use Mecha\Composer\Plugin\Installer;
+
 class Plugin implements PluginInterface, EventSubscriberInterface {
     private $installer;
     private function minifyJSON(string $in) {
