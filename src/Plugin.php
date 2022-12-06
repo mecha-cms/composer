@@ -16,8 +16,7 @@ use Mecha\Composer\Plugin\Installer;
 class Plugin implements PluginInterface, EventSubscriberInterface {
     private $installer;
     private function minify(Event $event) {
-        /*
-        $r = \dirname($event->getComposer()->getConfig()->get('vendor-dir'), 2);
+        $r = \dirname($vendor = $event->getComposer()->getConfig()->get('vendor-dir'), 2);
         $dir = new \RecursiveDirectoryIterator($r, \RecursiveDirectoryIterator::SKIP_DOTS);
         $files = new \RecursiveIteratorIterator($dir, \RecursiveIteratorIterator::CHILD_FIRST);
         $files_to_delete = [
@@ -29,6 +28,10 @@ class Plugin implements PluginInterface, EventSubscriberInterface {
         ];
         foreach ($files as $v) {
             $path = $v->getRealPath();
+            // Skip optimization in `mecha-cms/composer` folder just to be safe
+            if (0 === \strpos($path . \DIRECTORY_SEPARATOR, \strtr($vendor, ['/' => \DIRECTORY_SEPARATOR]) . \DIRECTORY_SEPARATOR . 'mecha-cms' . \DIRECTORY_SEPARATOR . 'composer' . \DIRECTORY_SEPARATOR)) {
+                continue;
+            }
             if ($v->isFile()) {
                 if (isset($files_to_delete[$n = $v->getFilename()])) {
                     \unlink($path);
@@ -59,7 +62,6 @@ class Plugin implements PluginInterface, EventSubscriberInterface {
                 continue;
             }
         }
-        */
     }
     private function minifyJSON(string $in) {
         return \json_encode(\json_decode($in), \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE);
@@ -241,10 +243,10 @@ class Plugin implements PluginInterface, EventSubscriberInterface {
     }
     public function deactivate(Composer $composer, IOInterface $io) {}
     public function onPostCreateProject(Event $event) {
-        return $this->minify($event);
+        $this->minify($event);
     }
     public function onPostInstall(Event $event) {
-        return $this->minify($event);
+        $this->minify($event);
     }
     public function onPostPackageInstall(PackageEvent $event) {
         $name = \basename(($package = $event->getOperation()->getPackage())->getName());
@@ -263,7 +265,7 @@ class Plugin implements PluginInterface, EventSubscriberInterface {
         }
     }
     public function onPostUpdate(Event $event) {
-        return $this->minify($event);
+        $this->minify($event);
     }
     public function uninstall(Composer $composer, IOInterface $io) {}
     public static function getSubscribedEvents() {
