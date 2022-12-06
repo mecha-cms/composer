@@ -15,6 +15,50 @@ use Mecha\Composer\Plugin\Installer;
 
 class Plugin implements PluginInterface, EventSubscriberInterface {
     private $installer;
+    private function minify(Event $event) {
+        $r = \dirname($event->getComposer()->getConfig()->get('vendor-dir'), 2);
+        $dir = new \RecursiveDirectoryIterator($r, \RecursiveDirectoryIterator::SKIP_DOTS);
+        $files = new \RecursiveIteratorIterator($dir, \RecursiveIteratorIterator::CHILD_FIRST);
+        $files_to_delete = [
+            '.editorconfig' => 1,
+            '.gitattributes' => 1,
+            '.gitignore' => 1,
+            '.gitmodules' => 1,
+            'README.md' => 1
+        ];
+        foreach ($files as $v) {
+            $path = $v->getRealPath();
+            if ($v->isFile()) {
+                if (isset($files_to_delete[$n = $v->getFilename()])) {
+                    \unlink($path);
+                    continue;
+                }
+                // Minify `composer.json` and `composer.lock`
+                if ('composer.json' === $n || 'composer.lock' === $n) {
+                    \file_put_contents($path, $this->minifyJSON(\file_get_contents($path)));
+                    continue;
+                }
+                // Minify `*.php` file(s)
+                if ('php' === $v->getExtension()) {
+                    $content = $this->minifyPHP(\file_get_contents($path));
+                    if ('state.php' === $n && (false !== \strpos($content, '=>function(') || false !== \strpos($content, '=>fn('))) {
+                        // Need to add a line-break here because <https://github.com/mecha-cms/mecha/blob/650fcccc13a5c6a2591d523d8f76411a6bdae8fb/engine/f.php#L1268-L1270>
+                        $content = \preg_replace('/("(?:[^"\\\]|\\\.)*"|\'(?:[^\'\\\]|\\\.)*\')=>(fn|function)\(/', \PHP_EOL . '$1=>$2(', $content);
+                    }
+                    \file_put_contents($path, $content);
+                }
+            }
+            if (
+                false !== \strpos($path . \DIRECTORY_SEPARATOR, \DIRECTORY_SEPARATOR . '.factory' . \DIRECTORY_SEPARATOR) ||
+                false !== \strpos($path . \DIRECTORY_SEPARATOR, \DIRECTORY_SEPARATOR . '.git' . \DIRECTORY_SEPARATOR) ||
+                false !== \strpos($path . \DIRECTORY_SEPARATOR, \DIRECTORY_SEPARATOR . '.github' . \DIRECTORY_SEPARATOR) ||
+                false !== \strpos($path . \DIRECTORY_SEPARATOR, \DIRECTORY_SEPARATOR . 'node_modules' . \DIRECTORY_SEPARATOR)
+            ) {
+                $v->isDir() ? \rmdir($path) : \unlink($path);
+                continue;
+            }
+        }
+    }
     private function minifyJSON(string $in) {
         return \json_encode(\json_decode($in), \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE);
     }
@@ -194,54 +238,12 @@ class Plugin implements PluginInterface, EventSubscriberInterface {
         $composer->getInstallationManager()->addInstaller($this->installer = new Installer($io, $composer));
     }
     public function deactivate(Composer $composer, IOInterface $io) {}
-    public function minify(Event $event) {
-        $r = \dirname($event->getComposer()->getConfig()->get('vendor-dir'), 2);
-        $dir = new \RecursiveDirectoryIterator($r, \RecursiveDirectoryIterator::SKIP_DOTS);
-        $files = new \RecursiveIteratorIterator($dir, \RecursiveIteratorIterator::CHILD_FIRST);
-        $files_to_delete = [
-            '.editorconfig' => 1,
-            '.gitattributes' => 1,
-            '.gitignore' => 1,
-            '.gitmodules' => 1,
-            'README.md' => 1
-        ];
-        foreach ($files as $v) {
-            $path = $v->getRealPath();
-            if ($v->isFile()) {
-                if (isset($files_to_delete[$n = $v->getFilename()])) {
-                    \unlink($path);
-                    continue;
-                }
-                // Minify `composer.json` and `composer.lock`
-                if ('composer.json' === $n || 'composer.lock' === $n) {
-                    \file_put_contents($path, $this->minifyJSON(\file_get_contents($path)));
-                    continue;
-                }
-                // Minify `*.php` file(s)
-                if ('php' === $v->getExtension()) {
-                    $content = $this->minifyPHP(\file_get_contents($path));
-                    if ('state.php' === $n && (false !== \strpos($content, '=>function(') || false !== \strpos($content, '=>fn('))) {
-                        // Need to add a line-break here because <https://github.com/mecha-cms/mecha/blob/650fcccc13a5c6a2591d523d8f76411a6bdae8fb/engine/f.php#L1268-L1270>
-                        $content = \preg_replace('/("(?:[^"\\\]|\\\.)*"|\'(?:[^\'\\\]|\\\.)*\')=>(fn|function)\(/', \PHP_EOL . '$1=>$2(', $content);
-                    }
-                    \file_put_contents($path, $content);
-                }
-            }
-            if (
-                false !== \strpos($path . \DIRECTORY_SEPARATOR, \DIRECTORY_SEPARATOR . '.factory' . \DIRECTORY_SEPARATOR) ||
-                false !== \strpos($path . \DIRECTORY_SEPARATOR, \DIRECTORY_SEPARATOR . '.git' . \DIRECTORY_SEPARATOR) ||
-                false !== \strpos($path . \DIRECTORY_SEPARATOR, \DIRECTORY_SEPARATOR . '.github' . \DIRECTORY_SEPARATOR) ||
-                false !== \strpos($path . \DIRECTORY_SEPARATOR, \DIRECTORY_SEPARATOR . 'node_modules' . \DIRECTORY_SEPARATOR)
-            ) {
-                $v->isDir() ? \rmdir($path) : \unlink($path);
-                continue;
-            }
-        }
-    }
     public function onPostCreateProject(Event $event) {
+        $event->getIO()->write('test onPostCreateProject');
         return $this->minify($event);
     }
     public function onPostInstall(Event $event) {
+        $event->getIO()->write('test onPostInstall');
         return $this->minify($event);
     }
     public function onPostPackageInstall(PackageEvent $event) {
@@ -259,8 +261,10 @@ class Plugin implements PluginInterface, EventSubscriberInterface {
                 \rename($v, \dirname($v) . \DIRECTORY_SEPARATOR . '.index.php');
             }
         }
+        $event->getIO()->write('test onPostPackageInstall:' . $name);
     }
     public function onPostUpdate(Event $event) {
+        $event->getIO()->write('test onPostUpdate');
         return $this->minify($event);
     }
     public function uninstall(Composer $composer, IOInterface $io) {}
