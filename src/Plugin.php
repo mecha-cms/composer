@@ -239,11 +239,9 @@ class Plugin implements PluginInterface, EventSubscriberInterface {
     }
     public function deactivate(Composer $composer, IOInterface $io) {}
     public function onPostCreateProject(Event $event) {
-        $event->getIO()->write('test onPostCreateProject');
         return $this->minify($event);
     }
     public function onPostInstall(Event $event) {
-        $event->getIO()->write('test onPostInstall');
         return $this->minify($event);
     }
     public function onPostPackageInstall(PackageEvent $event) {
@@ -257,14 +255,12 @@ class Plugin implements PluginInterface, EventSubscriberInterface {
                 if ($name === \basename(\dirname($v))) {
                     continue;
                 }
-                // $event->getIO()->write('Disabling ' . basename(dirname($v)) . ' layout...');
                 \rename($v, \dirname($v) . \DIRECTORY_SEPARATOR . '.index.php');
+                $event->getIO()->write('  - Layout <info>' . \basename(\dirname($v)) . '</info> is now disabled.');
             }
         }
-        $event->getIO()->write('test onPostPackageInstall:' . $name);
     }
     public function onPostUpdate(Event $event) {
-        $event->getIO()->write('test onPostUpdate');
         return $this->minify($event);
     }
     public function uninstall(Composer $composer, IOInterface $io) {}
