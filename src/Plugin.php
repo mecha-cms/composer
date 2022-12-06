@@ -16,6 +16,7 @@ use Mecha\Composer\Plugin\Installer;
 class Plugin implements PluginInterface, EventSubscriberInterface {
     private $installer;
     private function minify(Event $event) {
+        /*
         $r = \dirname($event->getComposer()->getConfig()->get('vendor-dir'), 2);
         $dir = new \RecursiveDirectoryIterator($r, \RecursiveDirectoryIterator::SKIP_DOTS);
         $files = new \RecursiveIteratorIterator($dir, \RecursiveIteratorIterator::CHILD_FIRST);
@@ -58,6 +59,7 @@ class Plugin implements PluginInterface, EventSubscriberInterface {
                 continue;
             }
         }
+        */
     }
     private function minifyJSON(string $in) {
         return \json_encode(\json_decode($in), \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE);
