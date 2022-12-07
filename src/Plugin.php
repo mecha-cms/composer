@@ -24,7 +24,11 @@ class Plugin implements PluginInterface, EventSubscriberInterface {
         'package-lock.json' => 1,
         'package.json' => 1,
         'test' => 1,
-        'test.php' => 1
+        'test.css' => 1,
+        'test.html' => 1,
+        'test.json' => 1,
+        'test.php' => 1,
+        'test.txt' => 1
     ];
     private $foldersToDelete = [
         '.factory' => 1,
