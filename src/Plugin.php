@@ -67,11 +67,11 @@ class Plugin implements PluginInterface, EventSubscriberInterface {
                     }
                     \file_put_contents($path, $content);
                 }
-                continue;
             }
             foreach (\array_filter($this->foldersToDelete) as $kk => $vv) {
                 if (false !== \strpos($this->d($path . '/'), $this->d('/' . $kk . '/'))) {
-                    \rmdir($path);
+                    $v->isDir() ? \rmdir($path) : \unlink($path);
+                    continue;
                 }
             }
         }
