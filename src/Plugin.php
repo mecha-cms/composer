@@ -14,26 +14,41 @@ use Composer\Script\ScriptEvents;
 use Mecha\Composer\Plugin\Installer;
 
 class Plugin implements PluginInterface, EventSubscriberInterface {
+    private $filesToDelete = [
+        '.editorconfig' => 1,
+        '.gitattributes' => 1,
+        '.gitignore' => 1,
+        '.gitmodules' => 1,
+        'README.md' => 1,
+        'package-lock.json' => 1,
+        'package.json' => 1,
+        'test' => 1,
+        'test.php' => 1
+    ];
+    private $foldersToDelete = [
+        '.factory',
+        '.git',
+        '.github',
+        '.node_modules',
+        'test'
+    ];
     private $installer;
+    private function d(string $path) {
+        // Normalize file/folder path
+        return \strtr($path, ['/' => \DIRECTORY_SEPARATOR]);
+    }
     private function minify(Event $event) {
-        $r = \dirname($vendor = $event->getComposer()->getConfig()->get('vendor-dir'), 2);
+        $r = $this->d(\dirname($vendor = $event->getComposer()->getConfig()->get('vendor-dir'), 2));
         $dir = new \RecursiveDirectoryIterator($r, \RecursiveDirectoryIterator::SKIP_DOTS);
         $files = new \RecursiveIteratorIterator($dir, \RecursiveIteratorIterator::CHILD_FIRST);
-        $files_to_delete = [
-            '.editorconfig' => 1,
-            '.gitattributes' => 1,
-            '.gitignore' => 1,
-            '.gitmodules' => 1,
-            'README.md' => 1
-        ];
         foreach ($files as $v) {
-            $path = $v->getRealPath();
+            $path = $this->d($v->getRealPath());
             // Skip optimization in `mecha-cms/composer` folder just to be safe
-            if (0 === \strpos($path . \DIRECTORY_SEPARATOR, \strtr($vendor, ['/' => \DIRECTORY_SEPARATOR]) . \DIRECTORY_SEPARATOR . 'mecha-cms' . \DIRECTORY_SEPARATOR . 'composer' . \DIRECTORY_SEPARATOR)) {
+            if (0 === \strpos($this->d($path . '/'), $this->d($vendor . '/mecha-cms/composer/'))) {
                 continue;
             }
             if ($v->isFile()) {
-                if (isset($files_to_delete[$n = $v->getFilename()])) {
+                if (!empty($this->filesToDelete[$n = $v->getFilename()])) {
                     \unlink($path);
                     continue;
                 }
@@ -52,14 +67,11 @@ class Plugin implements PluginInterface, EventSubscriberInterface {
                     \file_put_contents($path, $content);
                 }
             }
-            if (
-                false !== \strpos($path . \DIRECTORY_SEPARATOR, \DIRECTORY_SEPARATOR . '.factory' . \DIRECTORY_SEPARATOR) ||
-                false !== \strpos($path . \DIRECTORY_SEPARATOR, \DIRECTORY_SEPARATOR . '.git' . \DIRECTORY_SEPARATOR) ||
-                false !== \strpos($path . \DIRECTORY_SEPARATOR, \DIRECTORY_SEPARATOR . '.github' . \DIRECTORY_SEPARATOR) ||
-                false !== \strpos($path . \DIRECTORY_SEPARATOR, \DIRECTORY_SEPARATOR . 'node_modules' . \DIRECTORY_SEPARATOR)
-            ) {
-                $v->isDir() ? \rmdir($path) : \unlink($path);
-                continue;
+            foreach (\array_filter($this->foldersToDelete) as $kk => $vv) {
+                if (false !== \strpos($this->d($path . '/'), $this->d('/' . $kk . '/'))) {
+                    $v->isDir() ? \rmdir($path) : \unlink($path);
+                    continue;
+                }
             }
         }
     }
@@ -254,12 +266,12 @@ class Plugin implements PluginInterface, EventSubscriberInterface {
         // Automatically disable other layout after installing this layout
         if ('y.' === \substr($name, 0, 2)) {
             $name = \substr($name, 2);
-            $folder = \strtr(\dirname($r . '/' . $this->installer->getInstallPath($package)), ['/' => \DIRECTORY_SEPARATOR]);
-            foreach (\glob($folder . \DIRECTORY_SEPARATOR . '*' . \DIRECTORY_SEPARATOR . 'index.php', \GLOB_NOSORT) as $v) {
+            $folder = $this->d(\dirname($r . '/' . $this->installer->getInstallPath($package)));
+            foreach (\glob($this->d($folder . '/*/index.php'), \GLOB_NOSORT) as $v) {
                 if ($name === \basename(\dirname($v))) {
                     continue;
                 }
-                \rename($v, \dirname($v) . \DIRECTORY_SEPARATOR . '.index.php');
+                \rename($v, $this->d(\dirname($v) . '/.index.php'));
                 $event->getIO()->write('  - Layout <info>' . \basename(\dirname($v)) . '</info> is now disabled.');
             }
         }
