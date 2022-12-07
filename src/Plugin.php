@@ -19,6 +19,7 @@ class Plugin implements PluginInterface, EventSubscriberInterface {
         '.gitattributes' => 1,
         '.gitignore' => 1,
         '.gitmodules' => 1,
+        '.keep' => 1,
         'README.md' => 1,
         'package-lock.json' => 1,
         'package.json' => 1,
@@ -26,11 +27,11 @@ class Plugin implements PluginInterface, EventSubscriberInterface {
         'test.php' => 1
     ];
     private $foldersToDelete = [
-        '.factory',
-        '.git',
-        '.github',
-        '.node_modules',
-        'test'
+        '.factory' => 1,
+        '.git' => 1,
+        '.github' => 1,
+        '.node_modules' => 1,
+        'test' => 1
     ];
     private $installer;
     private function d(string $path) {
@@ -66,10 +67,11 @@ class Plugin implements PluginInterface, EventSubscriberInterface {
                     }
                     \file_put_contents($path, $content);
                 }
+                continue;
             }
             foreach (\array_filter($this->foldersToDelete) as $kk => $vv) {
                 if (false !== \strpos($this->d($path . '/'), $this->d('/' . $kk . '/'))) {
-                    $v->isDir() ? \rmdir($path) : \unlink($path);
+                    \rmdir($path);
                 }
             }
         }
