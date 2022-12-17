@@ -26,6 +26,7 @@ class Plugin implements PluginInterface, EventSubscriberInterface {
         'test' => 1,
         'test.css' => 1,
         'test.html' => 1,
+        'test.js' => 1,
         'test.json' => 1,
         'test.php' => 1,
         'test.txt' => 1
@@ -43,6 +44,7 @@ class Plugin implements PluginInterface, EventSubscriberInterface {
         return \strtr($path, ['/' => \DIRECTORY_SEPARATOR]);
     }
     private function minify(Event $event) {
+        $minify = !empty($event->getComposer()->getPackage()->getExtra()['minify']);
         $r = $this->d(\dirname($vendor = $event->getComposer()->getConfig()->get('vendor-dir'), 2));
         $dir = new \RecursiveDirectoryIterator($r, \RecursiveDirectoryIterator::SKIP_DOTS);
         $files = new \RecursiveIteratorIterator($dir, \RecursiveIteratorIterator::CHILD_FIRST);
@@ -57,19 +59,21 @@ class Plugin implements PluginInterface, EventSubscriberInterface {
                     \unlink($path);
                     continue;
                 }
-                // Minify `composer.json` and `composer.lock`
-                if ('composer.json' === $n || 'composer.lock' === $n) {
-                    \file_put_contents($path, $this->minifyJSON(\file_get_contents($path)));
-                    continue;
-                }
-                // Minify `*.php` file(s)
-                if ('php' === $v->getExtension()) {
-                    $content = $this->minifyPHP(\file_get_contents($path));
-                    if ('state.php' === $n && (false !== \strpos($content, '=>function(') || false !== \strpos($content, '=>fn('))) {
-                        // Need to add a line-break here because <https://github.com/mecha-cms/mecha/blob/650fcccc13a5c6a2591d523d8f76411a6bdae8fb/engine/f.php#L1268-L1270>
-                        $content = \preg_replace('/("(?:[^"\\\]|\\\.)*"|\'(?:[^\'\\\]|\\\.)*\')=>(fn|function)\(/', \PHP_EOL . '$1=>$2(', $content);
+                if ($minify) {
+                    // Minify `composer.json` and `composer.lock`
+                    if ('composer.json' === $n || 'composer.lock' === $n) {
+                        \file_put_contents($path, $this->minifyJSON(\file_get_contents($path)));
+                        continue;
                     }
-                    \file_put_contents($path, $content);
+                    // Minify `*.php` file(s)
+                    if ('php' === $v->getExtension()) {
+                        $content = $this->minifyPHP(\file_get_contents($path));
+                        if ('state.php' === $n && (false !== \strpos($content, '=>function(') || false !== \strpos($content, '=>fn('))) {
+                            // Need to add a line-break here because <https://github.com/mecha-cms/mecha/blob/650fcccc13a5c6a2591d523d8f76411a6bdae8fb/engine/f.php#L1268-L1270>
+                            $content = \preg_replace('/("(?:[^"\\\]|\\\.)*"|\'(?:[^\'\\\]|\\\.)*\')=>(fn|function)\(/', \PHP_EOL . '$1=>$2(', $content);
+                        }
+                        \file_put_contents($path, $content);
+                    }
                 }
             }
             foreach (\array_filter($this->foldersToDelete) as $kk => $vv) {
