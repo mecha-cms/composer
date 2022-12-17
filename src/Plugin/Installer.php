@@ -12,6 +12,12 @@ class Installer extends LibraryInstaller {
     }
     public function getInstallPath(PackageInterface $package) {
         $name = \basename($package->getPrettyName());
+        if ('extension' === $this->type) {
+            return $this->d('lot/x/' . $name);
+        }
+        if ('layout' === $this->type) {
+            return $this->d('lot/y/' . $name);
+        }
         if ('x.' === \substr($name, 0, 2)) {
             return $this->d('lot/x/' . \substr($name, 2));
         }
