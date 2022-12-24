@@ -7,7 +7,7 @@ Usage
 -----
 
 ~~~ sh
-$ composer create-project mecha-cms/mecha
-$ cd mecha
-$ composer require mecha-cms/x.panel
+composer create-project mecha-cms/mecha
+cd mecha
+composer require mecha-cms/x.panel
 ~~~
