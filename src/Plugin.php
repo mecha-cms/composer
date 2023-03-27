@@ -272,7 +272,7 @@ class Plugin implements PluginInterface, EventSubscriberInterface {
     public function onPostPackageInstall(PackageEvent $event) {
         $name = \basename(($package = $event->getOperation()->getPackage())->getName());
         $r = \dirname($event->getComposer()->getConfig()->get('vendor-dir'), 2);
-        // Automatically disable other layout after installing this layout
+        // Automatically disable other layout(s) after installing this layout
         if ('y.' === \substr($name, 0, 2)) {
             $name = \substr($name, 2);
             $folder = $this->d(\dirname($r . '/' . $this->installer->getInstallPath($package)));
