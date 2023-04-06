@@ -18,6 +18,9 @@ class Installer extends LibraryInstaller {
         if ('layout' === $this->type) {
             return $this->d('lot/y/' . $name);
         }
+        if ('patch' === $this->type) {
+            // TODO
+        }
         if ('x.' === \substr($name, 0, 2)) {
             return $this->d('lot/x/' . \substr($name, 2));
         }

@@ -68,6 +68,13 @@ class Plugin implements PluginInterface, EventSubscriberInterface {
                     // Minify `*.php` file(s)
                     if ('php' === $v->getExtension()) {
                         $content = $this->minifyPHP(\file_get_contents($path));
+                        // Attribute syntax is available since PHP 8.0.0. All PHP versions prior to that will treat them
+                        // as normal comment token. Therefore, if there is no line-break after the comment token, it
+                        // will cause a syntax error because all PHP syntax that comes after the comment token will be
+                        // treated as part of the comment token.
+                        if (\version_compare(\PHP_VERSION, '8.0.0', '<') && false !== \strpos($content, '#[')) {
+                            $content = \preg_replace('/#\[(?:"(?:[^"\\\]|\\\.)*"|\'(?:[^\'\\\]|\\\.)*\'|[^\[\]]|(?R))*\]/', '$0' . "\n", $content);
+                        }
                         if ('state.php' === $n && (false !== \strpos($content, '=>function(') || false !== \strpos($content, '=>fn('))) {
                             // Need to add a line-break here because <https://github.com/mecha-cms/mecha/blob/650fcccc13a5c6a2591d523d8f76411a6bdae8fb/engine/f.php#L1268-L1270>
                             $content = \preg_replace('/("(?:[^"\\\]|\\\.)*"|\'(?:[^\'\\\]|\\\.)*\')=>(fn|function)\(/', \PHP_EOL . '$1=>$2(', $content);
