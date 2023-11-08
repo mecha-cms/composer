@@ -73,7 +73,7 @@ class Plugin implements PluginInterface, EventSubscriberInterface {
                         // will cause a syntax error because all PHP syntax that comes after the comment token will be
                         // treated as part of the comment token.
                         if (\version_compare(\PHP_VERSION, '8.0.0', '<') && false !== \strpos($content, '#[')) {
-                            $content = \preg_replace('/#\[(?:"(?:[^"\\\]|\\\.)*"|\'(?:[^\'\\\]|\\\.)*\'|[^\[\]]|(?R))*\]/', '$0' . "\n", $content);
+                            $content = \preg_replace('/#\[(?:"(?:[^"\\\]|\\\.)*"|\'(?:[^\'\\\]|\\\.)*\'|[^\[\]]|(?R))*\]/', '$0' . \PHP_EOL, $content);
                         }
                         if ('state.php' === $n && (false !== \strpos($content, '=>function(') || false !== \strpos($content, '=>fn('))) {
                             // Need to add a line-break here because <https://github.com/mecha-cms/mecha/blob/650fcccc13a5c6a2591d523d8f76411a6bdae8fb/engine/f.php#L1268-L1270>
