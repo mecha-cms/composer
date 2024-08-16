@@ -44,10 +44,17 @@ class Plugin implements PluginInterface, EventSubscriberInterface {
         return \strtr($path, ['/' => \DIRECTORY_SEPARATOR]);
     }
     private function minify(Event $event) {
-        $minify = !empty($event->getComposer()->getPackage()->getExtra()['minify']);
+        $extra = $event->getComposer()->getPackage()->getExtra();
+        $minify = !empty($extra['minify']);
+        $delete = empty($extra['no-delete']);
         $r = $this->d(\dirname($vendor = $event->getComposer()->getConfig()->get('vendor-dir'), 2));
         $dir = new \RecursiveDirectoryIterator($r, \RecursiveDirectoryIterator::SKIP_DOTS);
         $files = new \RecursiveIteratorIterator($dir, \RecursiveIteratorIterator::CHILD_FIRST);
+        print('Running Mecha-cms composer plugin');
+        if (!($delete || $minify)){
+            print('nothing to minify or delete!' . PHP_EOL);
+            return;
+        }
         foreach ($files as $v) {
             $path = $this->d($v->getRealPath());
             // Skip optimization in `mecha-cms/composer` folder just to be safe
@@ -55,7 +62,8 @@ class Plugin implements PluginInterface, EventSubscriberInterface {
                 continue;
             }
             if ($v->isFile()) {
-                if (!empty($this->filesToDelete[$n = $v->getFilename()])) {
+                if ($delete && !empty($this->filesToDelete[$n = $v->getFilename()])) {
+                    print('deleting file ' . $path . PHP_EOL);
                     \unlink($path);
                     continue;
                 }
@@ -83,8 +91,12 @@ class Plugin implements PluginInterface, EventSubscriberInterface {
                     }
                 }
             }
+            if (!$delete){
+                return;
+            }
             foreach (\array_filter($this->foldersToDelete) as $kk => $vv) {
                 if (false !== \strpos($this->d($path . '/'), $this->d('/' . $kk . '/'))) {
+                    print('deleting folder ' . $path . PHP_EOL);
                     $v->isDir() ? \rmdir($path) : \unlink($path);
                     continue;
                 }
