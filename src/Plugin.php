@@ -14,67 +14,46 @@ use Composer\Script\ScriptEvents;
 use Mecha\Composer\Plugin\Installer;
 
 class Plugin implements PluginInterface, EventSubscriberInterface {
-    private $filesToDelete = [
-        '.editorconfig' => 1,
-        '.gitattributes' => 1,
-        '.gitignore' => 1,
-        '.gitmodules' => 1,
-        '.keep' => 1,
-        'README.md' => 1,
-        'package-lock.json' => 1,
-        'package.json' => 1,
-        'test' => 1,
-        'test.css' => 1,
-        'test.html' => 1,
-        'test.js' => 1,
-        'test.json' => 1,
-        'test.php' => 1,
-        'test.txt' => 1
-    ];
-    private $foldersToDelete = [
-        '.factory' => 1,
-        '.git' => 1,
-        '.github' => 1,
-        '.node_modules' => 1,
-        'test' => 1
-    ];
     private $installer;
     private function d(string $path) {
         // Normalize file/folder path
         return \strtr($path, ['/' => \DIRECTORY_SEPARATOR]);
     }
     private function minify(Event $event) {
-        $extra = $event->getComposer()->getPackage()->getExtra();
-        $minify = !empty($extra['minify']);
-        $delete = empty($extra['no-delete']);
+        $minify_on_install = !empty($event->getComposer()->getPackage()->getExtra()['minify-on-install']);
+        $remove_on_install = (array) ($event->getComposer()->getPackage()->getExtra()['remove-on-install'] ?? []);
         $r = $this->d(\dirname($vendor = $event->getComposer()->getConfig()->get('vendor-dir'), 2));
         $dir = new \RecursiveDirectoryIterator($r, \RecursiveDirectoryIterator::SKIP_DOTS);
         $files = new \RecursiveIteratorIterator($dir, \RecursiveIteratorIterator::CHILD_FIRST);
-        print('Running Mecha-cms composer plugin');
-        if (!($delete || $minify)){
-            print('nothing to minify or delete!' . PHP_EOL);
-            return;
-        }
-        foreach ($files as $v) {
-            $path = $this->d($v->getRealPath());
+        foreach ($files as $file) {
+            $path = $this->d($file->getRealPath());
             // Skip optimization in `mecha-cms/composer` folder just to be safe
             if (0 === \strpos($this->d($path . '/'), $this->d($vendor . '/mecha-cms/composer/'))) {
                 continue;
             }
-            if ($v->isFile()) {
-                if ($delete && !empty($this->filesToDelete[$n = $v->getFilename()])) {
-                    print('deleting file ' . $path . PHP_EOL);
-                    \unlink($path);
+            if ($file->isFile()) {
+                // Relative to the project folder
+                if (!empty($remove_on_install[$n = '/' . \strtr($path, [$r . '/' => ""])])) {
+                    if (\unlink($path)) {
+                        unset($remove_on_install[$n]);
+                    }
                     continue;
                 }
-                if ($minify) {
+                // Relative to the library folder
+                if (!empty($remove_on_install[$n = $file->getFilename()])) {
+                    if (\unlink($path)) {
+                        unset($remove_on_install[$n]);
+                    }
+                    continue;
+                }
+                if ($minify_on_install) {
                     // Minify `composer.json` and `composer.lock`
                     if ('composer.json' === $n || 'composer.lock' === $n) {
                         \file_put_contents($path, $this->minifyJSON(\file_get_contents($path)));
                         continue;
                     }
                     // Minify `*.php` file(s)
-                    if ('php' === $v->getExtension()) {
+                    if ('php' === $file->getExtension()) {
                         $content = $this->minifyPHP(\file_get_contents($path));
                         // Attribute syntax is available since PHP 8.0.0. All PHP versions prior to that will treat them
                         // as normal comment token. Therefore, if there is no line-break after the comment token, it
@@ -91,17 +70,37 @@ class Plugin implements PluginInterface, EventSubscriberInterface {
                     }
                 }
             }
-            if (!$delete){
-                return;
-            }
-            foreach (\array_filter($this->foldersToDelete) as $kk => $vv) {
-                if (false !== \strpos($this->d($path . '/'), $this->d('/' . $kk . '/'))) {
-                    print('deleting folder ' . $path . PHP_EOL);
-                    $v->isDir() ? \rmdir($path) : \unlink($path);
-                    continue;
+        }
+        if (!empty($remove_on_install)) {
+            foreach (\array_filter($remove_on_install) as $k => $v) {
+                if ('/*' === \substr($k, -2)) {
+                    $folder = \substr($k, 0, -1);
+                    $folder_remove = false;
+                } else if ('/' === \substr($k, -1)) {
+                    $folder = $k;
+                    $folder_remove = true;
+                } else {
+                    $folder = $k . '/';
+                    $folder_remove = true;
+                }
+                foreach ($files as $file) {
+                    $path = $this->d($file->getRealPath());
+                    if (0 === \strpos($path . '/', $r . $folder)) {
+                        if ($file->isDir() && $folder_remove ? \rmdir($path) : \unlink($path)) {
+                            unset($remove_on_install[$k]);
+                        }
+                        continue;
+                    }
+                    if (0 === \strpos($file->getFilename() . '/', $folder)) {
+                        if ($file->isDir() && $folder_remove ? \rmdir($path) : \unlink($path)) {
+                            unset($remove_on_install[$k]);
+                        }
+                        continue;
+                    }
                 }
             }
         }
+        $event->getIO()->write(\json_encode($remove_on_install, \JSON_PRETTY_PRINT));
     }
     private function minifyJSON(string $in) {
         return \json_encode(\json_decode($in), \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE);
