@@ -86,13 +86,13 @@ class Plugin implements PluginInterface, EventSubscriberInterface {
                 foreach ($files as $file) {
                     $path = $this->d($file->getRealPath());
                     if (0 === \strpos($path . '/', $r . $folder)) {
-                        if ($file->isDir() && $folder_remove ? \rmdir($path) : \unlink($path)) {
+                        if ($file->isDir() && $folder_remove ? (!(new \FilesystemIterator($path))->valid() && \rmdir($path)) : \unlink($path)) {
                             unset($remove_on_install[$k]);
                         }
                         continue;
                     }
                     if (0 === \strpos($file->getFilename() . '/', $folder)) {
-                        if ($file->isDir() && $folder_remove ? \rmdir($path) : \unlink($path)) {
+                        if ($file->isDir() && $folder_remove ? (!(new \FilesystemIterator($path))->valid() && \rmdir($path)) : \unlink($path)) {
                             unset($remove_on_install[$k]);
                         }
                         continue;
@@ -100,7 +100,11 @@ class Plugin implements PluginInterface, EventSubscriberInterface {
                 }
             }
         }
-        $event->getIO()->write(\json_encode($remove_on_install, \JSON_PRETTY_PRINT));
+        if (!empty($remove_on_install)) {
+            foreach (\array_filter($remove_on_install) as $k => $v) {
+                // $event->getIO()->write('  - Could not find file/folder matching pattern <info>' . $k . '</info>');
+            }
+        }
     }
     private function minifyJSON(string $in) {
         return \json_encode(\json_decode($in), \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE);
