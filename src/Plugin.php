@@ -20,6 +20,7 @@ class Plugin implements PluginInterface, EventSubscriberInterface {
         return \strtr($path, ['/' => \DIRECTORY_SEPARATOR]);
     }
     private function minify(Event $event) {
+        $d = \DIRECTORY_SEPARATOR;
         $minify_on_install = !empty($event->getComposer()->getPackage()->getExtra()['minify-on-install']);
         $remove_on_install = (array) ($event->getComposer()->getPackage()->getExtra()['remove-on-install'] ?? []);
         $r = $this->d(\dirname($vendor = $event->getComposer()->getConfig()->get('vendor-dir'), 2));
@@ -28,12 +29,12 @@ class Plugin implements PluginInterface, EventSubscriberInterface {
         foreach ($files as $file) {
             $path = $this->d($file->getRealPath());
             // Skip optimization in `mecha-cms/composer` folder just to be safe
-            if (0 === \strpos($this->d($path . '/'), $this->d($vendor . '/mecha-cms/composer/'))) {
+            if (0 === \strpos($path . $d, $this->d($vendor . '/mecha-cms/composer/'))) {
                 continue;
             }
             if ($file->isFile()) {
                 // Relative to the project folder
-                if (!empty($remove_on_install[$n = '/' . \strtr($path, [$r . '/' => ""])])) {
+                if (!empty($remove_on_install[$n = '/' . \strtr($path, [$r . $d => "", $d => '/'])])) {
                     if (\unlink($path)) {
                         unset($remove_on_install[$n]);
                     }
@@ -73,6 +74,7 @@ class Plugin implements PluginInterface, EventSubscriberInterface {
         }
         if (!empty($remove_on_install)) {
             foreach (\array_filter($remove_on_install) as $k => $v) {
+                $k = \strtr($k, [$d => '/']);
                 if ('/*' === \substr($k, -2)) {
                     $folder = \substr($k, 0, -1);
                     $folder_remove = false;
@@ -83,15 +85,16 @@ class Plugin implements PluginInterface, EventSubscriberInterface {
                     $folder = $k . '/';
                     $folder_remove = true;
                 }
+                $folder = $this->d($folder);
                 foreach ($files as $file) {
                     $path = $this->d($file->getRealPath());
-                    if (0 === \strpos($path . '/', $r . $folder)) {
+                    if (0 === \strpos($path . $d, $r . $folder)) {
                         if ($file->isDir() && $folder_remove ? (!(new \FilesystemIterator($path))->valid() && \rmdir($path)) : \unlink($path)) {
                             unset($remove_on_install[$k]);
                         }
                         continue;
                     }
-                    if (0 === \strpos($file->getFilename() . '/', $folder)) {
+                    if (0 === \strpos($file->getFilename() . $d, $folder)) {
                         if ($file->isDir() && $folder_remove ? (!(new \FilesystemIterator($path))->valid() && \rmdir($path)) : \unlink($path)) {
                             unset($remove_on_install[$k]);
                         }
