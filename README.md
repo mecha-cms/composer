@@ -16,12 +16,13 @@ composer require mecha-cms/x.panel
 >
 > This plugin will delete the files and folders listed in the `extra.remove-on-install` property of the root
 > [`composer.json`](https://github.com/mecha-cms/mecha/blob/main/composer.json) file. The existence of a
-> `.gitattributes` file on a GitHub project may cause some confusion, as removing a specific list of files or folders
-> from the `extra.remove-on-install` property will not prevent those files and folders from being deleted by the plugin.
+> `.gitattributes` file on a GitHub project may cause some confusion, as removing a specific list of files and/or
+> folders from the `extra.remove-on-install` property will not prevent those files and folders from being deleted by the
+> plugin.
 >
 > This is because the `export-ignore` commands in a `.gitattributes` file are more dominant than the plugin’s file and
 > folder delete commands, so if there are `export-ignore` commands in the GitHub project’s `.gitattributes` file, then
-> those files and folders will be automatically excluded from the Composer package anyway.
+> those files and folders will be automatically excluded from the Composer package.
 >
 > There is nothing you can do in this case except to ask the developer of that extension/layout not to mark certain
 > files and folders as being subject to removal from the package.
