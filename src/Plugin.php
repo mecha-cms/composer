@@ -20,9 +20,9 @@ class Plugin implements PluginInterface, EventSubscriberInterface {
         return \strtr($path, ['/' => \DIRECTORY_SEPARATOR]);
     }
     private function minify(Event $event) {
-        $d = \DIRECTORY_SEPARATOR;
         $minify_on_install = !empty($event->getComposer()->getPackage()->getExtra()['minify-on-install']);
         $remove_on_install = (array) ($event->getComposer()->getPackage()->getExtra()['remove-on-install'] ?? []);
+        $d = \DIRECTORY_SEPARATOR;
         $r = $this->d(\dirname($vendor = $event->getComposer()->getConfig()->get('vendor-dir'), 2));
         $dir = new \RecursiveDirectoryIterator($r, \RecursiveDirectoryIterator::SKIP_DOTS);
         $files = new \RecursiveIteratorIterator($dir, \RecursiveIteratorIterator::CHILD_FIRST);
