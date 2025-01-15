@@ -50,22 +50,18 @@ class Plugin implements PluginInterface, EventSubscriberInterface {
                 if ($minify_on_install) {
                     // Minify `composer.json` and `composer.lock`
                     if ('composer.json' === $n || 'composer.lock' === $n) {
-                        \file_put_contents($path, $this->minifyJSON(\file_get_contents($path)));
+                        \file_put_contents($path, (string) $this->minifyJSON(\file_get_contents($path)));
                         continue;
                     }
                     // Minify `*.php` file(s)
                     if ('php' === $file->getExtension()) {
-                        $content = $this->minifyPHP(\file_get_contents($path));
+                        $content = (string) $this->minifyPHP(\file_get_contents($path));
                         // Attribute syntax is available since PHP 8.0.0. All PHP versions prior to that will treat them
                         // as normal comment token. Therefore, if there is no line-break after the comment token, it
                         // will cause a syntax error because all PHP syntax that comes after the comment token will be
                         // treated as part of the comment token.
                         if (\version_compare(\PHP_VERSION, '8.0.0', '<') && false !== \strpos($content, '#[')) {
                             $content = \preg_replace('/#\[(?:"(?:[^"\\\]|\\\.)*"|\'(?:[^\'\\\]|\\\.)*\'|[^\[\]]|(?R))*\]/', '$0' . \PHP_EOL, $content);
-                        }
-                        if ('state.php' === $n && (false !== \strpos($content, '=>function(') || false !== \strpos($content, '=>fn('))) {
-                            // Need to add a line-break here because <https://github.com/mecha-cms/mecha/blob/650fcccc13a5c6a2591d523d8f76411a6bdae8fb/engine/f.php#L1268-L1270>
-                            $content = \preg_replace('/("(?:[^"\\\]|\\\.)*"|\'(?:[^\'\\\]|\\\.)*\')=>(fn|function)\(/', \PHP_EOL . '$1=>$2(', $content);
                         }
                         \file_put_contents($path, $content);
                     }
@@ -109,180 +105,266 @@ class Plugin implements PluginInterface, EventSubscriberInterface {
             }
         }
     }
-    private function minifyJSON(string $in) {
-        return \json_encode(\json_decode($in), \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE);
-    }
-    // Based on <https://github.com/mecha-cms/x.minify>
-    private function minifyPHP(string $in, int $comment = 2, int $quote = 1) {
-        if ("" === ($in = \trim($in))) {
-            return "";
+    // Based on <https://github.com/taufik-nurrohman/minify>
+    private function minifyJSON(?string $from): ?string {
+        if ("" === ($from = \trim($from ?? ""))) {
+            return null;
         }
-        $out = "";
-        $tokens = \token_get_all($in);
-        foreach ($tokens as $k => $v) {
-            // Peek previous token
-            if (\is_array($prev = $tokens[$k - 1] ?? "")) {
-                $prev = $prev[1];
+        if ('""' === $from || '[]' === $from || 'false' === $from || 'null' === $from || 'true' === $from || '{}' === $from || \is_numeric($from)) {
+            return $from;
+        }
+        $c1 = ',:[]{}';
+        $to = "";
+        while (false !== ($chop = \strpbrk($from, '"' . $c1))) {
+            if ("" !== ($v = \strstr($from, $c = $chop[0], true))) {
+                $from = $chop;
+                $to .= \trim($v);
             }
-            // Peek next token
-            if (\is_array($next = $tokens[$k + 1] ?? "")) {
-                $next = $next[1];
+            if (false !== \strpos($c1, $c)) {
+                $from = \substr($from, 1);
+                $to .= $chop[0];
+                continue;
+            }
+            if ('""' === \substr($chop, 0, 2)) {
+                $from = \substr($from, 2);
+                $to .= '""';
+                continue;
+            }
+            if ('"' === $c && \preg_match('/^"[^"\\\\]*(?>\\\\.[^"\\\\]*)*"/', $chop, $m)) {
+                $from = \substr($from, \strlen($m[0]));
+                $to .= $m[0];
+                continue;
+            }
+            $from = "";
+            $to .= \trim($chop); // `false`, `null`, `true`, `1`, `1.0`
+        }
+        if ("" !== $from) {
+            $to .= \trim($from);
+        }
+        return "" !== ($to = \trim($to)) ? $to : null;
+    }
+    // Based on <https://github.com/taufik-nurrohman/minify>
+    private function minifyPHP(?string $from): ?string {
+        if ("" === ($from = \trim($from ?? ""))) {
+            return null;
+        }
+        $count = \count($lot = \token_get_all($from));
+        $in_array = $is_array = 0;
+        $to = "";
+        foreach ($lot as $k => $v) {
+            if ('stdclass' === \strtolower(\substr($to, -8)) && \preg_match('/\bnew \\\\?stdclass$/i', $to, $m)) {
+                $to = \trim(\substr($to, 0, -\strlen($m[0]))) . '(object)[]';
             }
             if (\is_array($v)) {
-                if (\T_COMMENT === $v[0] || \T_DOC_COMMENT === $v[0]) {
-                    if (
-                        // Keep comment
-                        1 === $comment || (
-                            // Keep comment with condition(s)
-                            2 === $comment && (
-                                // Detect special comment from the third character
-                                // It should be a `!` or `*` → `/*! keep */` or `/** keep */`
-                                !empty($v[1][2]) && false !== \strpos('!*', $v[1][2]) ||
-                                // Detect license comment from the content
-                                // It should contains character(s) like `@license`
-                                false !== \strpos($v[1], '@licence') || // noun
-                                false !== \strpos($v[1], '@license') || // verb
-                                false !== \strpos($v[1], '@preserve')
-                            )
-                        )
-                    ) {
-                        $v[1] = \ltrim(\substr($v[1], 2, -2), '!*');
-                        $out .= '/*' . \trim(\strtr($v[1], ['@preserve' => ""])) . '*/';
-                        continue;
+                // Can be `array $asdf` or `array (`
+                if (\T_ARRAY === $v[0]) {
+                    $i = $k + 1;
+                    while (isset($lot[$i])) {
+                        if (\is_array($lot[$i]) && \T_WHITESPACE !== $lot[$i][0]) {
+                            break;
+                        }
+                        if (\is_string($lot[$i])) {
+                            if ('(' === $lot[$i]) {
+                                $is_array += 1;
+                            }
+                            break;
+                        }
+                        ++$i;
                     }
-                    // Remove comment
+                    if (!$is_array) {
+                        $to .= $v[1];
+                    }
+                    continue;
+                }
+                if ('_CAST' === \substr(\token_name($v[0]), -5)) {
+                    $cast = \trim(\substr($v[1], 1, -1));
+                    if ('boolean' === $cast) {
+                        $cast = 'bool';
+                    } else if ('double' === $cast || 'real' === $cast) {
+                        $cast = 'float';
+                    } else if ('integer' === $cast) {
+                        $cast = 'int';
+                    }
+                    $to .= '(' . $cast . ')';
                     continue;
                 }
                 if (\T_CLOSE_TAG === $v[0]) {
-                    // <https://www.php.net/manual/en/language.basic-syntax.instruction-separation.php>
-                    if ("" === $next) {
-                        continue; // Remove the last PHP closing tag
+                    if ($k === $count - 1) {
+                        $to = \trim($to, ';') . ';';
+                        continue;
                     }
-                    if (';' === \substr($out, -1)) {
-                        $out = \substr($out, 0, -1); // Remove the last semi-colon before PHP closing tag
-                    }
+                    // <https://www.php.net/language.basic-syntax.instruction-separation>
+                    $to = \trim(\trim($to, ';')) . $v[1];
+                    continue;
                 }
-                if (\T_OPEN_TAG === $v[0]) {
-                    $out .= \rtrim($v[1]) . ' ';
+                if (\T_COMMENT === $v[0] || \T_DOC_COMMENT === $v[0]) {
+                    if (0 === \strpos($v[1], '/*') && false !== \strpos('!*', $v[1][2])) {
+                        if (false !== \strpos($v[1], "\n")) {
+                            $to .= '/*' . \substr($v[1], 3);
+                        } else {
+                            $to .= '/*' . \trim(\substr($v[1], 3, -2)) . '*/';
+                        }
+                    }
+                    continue;
+                }
+                if (\T_CONSTANT_ENCAPSED_STRING === $v[0]) {
+                    if ('(binary)' === \substr($to, -8)) {
+                        $to = \substr($to, 0, -8) . 'b';
+                    }
+                    $to = \trim($to) . $v[1];
+                    continue;
+                }
+                if (\T_DNUMBER === $v[0]) {
+                    $test = \strtolower(\rtrim(\trim(\strtr($v[1], ['_' => ""]), '0'), '.'));
+                    if (false === \strpos($test = "" !== $test ? $test : '0', '.')) {
+                        if (false === \strpos($test, 'e')) {
+                            $test .= '.0';
+                        }
+                    }
+                    if ('(int)' === \substr($to, -5)) {
+                        $to = \substr($to, 0, -5) . \var_export((int) $test, true);
+                        continue;
+                    }
+                    if ('(string)' === \substr($to, -8)) {
+                        $to = \substr($to, 0, -8) . "'" . $test . "'";
+                        continue;
+                    }
+                    $to .= $test;
                     continue;
                 }
                 if (\T_ECHO === $v[0] || \T_PRINT === $v[0]) {
-                    if ('<?php ' === \substr($out, -6)) {
-                        $out = \substr($out, 0, -4) . '='; // Replace `<?php echo` with `<?=`
+                    if ('<?php ' === \substr($to, -6)) {
+                        // Replace `<?php echo` with `<?=`
+                        $to = \substr($to, 0, -4) . '=';
                         continue;
                     }
-                    $out .= 'echo '; // Replace `print` with `echo`
+                    // Replace `print` with `echo`
+                    $to .= 'echo ';
                     continue;
                 }
-                if (\T_CASE === $v[0] || \T_RETURN === $v[0] || \T_YIELD === $v[0]) {
-                    $out .= $v[1] . ' ';
-                    continue;
-                }
-                if (\T_IF === $v[0]) {
-                    if ('else ' === \substr($out, -5)) {
-                        $out = \substr($out, 0, -1) . 'if'; // Replace `else if` with `elseif`
+                if (\T_ENCAPSED_AND_WHITESPACE === $v[0]) {
+                    $v[1] = \strtr($v[1], ["S\n" => "\\x53\n"]);
+                    // `asdf { $asdf } asdf`
+                    if ('}' === (\trim($v[1])[0] ?? 0) && false !== ($test = \strrchr($to, '{'))) {
+                        $to = \substr($to, 0, -\strlen($test)) . '{' . \trim(\substr($test, 1)) . \trim($v[1]);
                         continue;
                     }
-                }
-                if (\T_DNUMBER === $v[0]) {
-                    if (0 === \strpos($v[1], '0.')) {
-                        $v[1] = \substr($v[1], 1); // Replace `0.` prefix with `.` from float
-                    }
-                    $v[1] = \rtrim(\rtrim($v[1], '0'), '.'); // Remove trailing `.0` from float
-                    $out .= $v[1];
-                    continue;
-                }
-                if (\T_START_HEREDOC === $v[0]) {
-                    $out .= '<<<' . ("'" === $v[1][3] ? "'S'" : 'S') . "\n";
+                    $to .= $v[1] . (false !== \strpos(" \n\r\t", \substr($v[1], -1)) ? "\x1a" : "");
                     continue;
                 }
                 if (\T_END_HEREDOC === $v[0]) {
-                    $out .= 'S';
+                    $to .= 'S';
                     continue;
                 }
-                if (\T_CONSTANT_ENCAPSED_STRING === $v[0] || \T_ENCAPSED_AND_WHITESPACE === $v[0]) {
-                    $out .= $v[1];
+                if (\T_INLINE_HTML === $v[0]) {
+                    $to .= $v[1];
                     continue;
                 }
-                // Any type cast
-                if (0 === \strpos($v[1], '(') && ')' === \substr($v[1], -1) && '_CAST' === \substr(\token_name($v[0]), -5)) {
-                    $out = \rtrim($out) . '(' . \trim(\substr($v[1], 1, -1)) . ')'; // Remove white-space after `(` and before `)`
+                if (\T_LNUMBER === $v[0]) {
+                    $test = \strtolower(\ltrim(\strtr($v[1], ['_' => ""]), '0'));
+                    if ('(float)' === \substr($to, -7)) {
+                        $to = \substr($to, 0, -7) . \var_export((float) $test, true);
+                        continue;
+                    }
+                    $test = "" !== $test ? $test : '0';
+                    if ('(string)' === \substr($to, -8)) {
+                        $to = \substr($to, 0, -8) . "'" . $test . "'";
+                        continue;
+                    }
+                    $to .= $test;
+                    continue;
+                }
+                if (\T_OPEN_TAG === $v[0]) {
+                    $to .= \trim($v[1]) . ' ';
+                    continue;
+                }
+                if (\T_OPEN_TAG_WITH_ECHO === $v[0]) {
+                    $to .= $v[1];
+                    continue;
+                }
+                if (\T_START_HEREDOC === $v[0]) {
+                    if ("'" === $v[1][3]) {
+                        $to .= "<<<'S'\n";
+                        continue;
+                    }
+                    $to .= "<<<S\n";
+                    continue;
+                }
+                if (\T_STRING === $v[0]) {
+                    $test = \strtolower($v[1]);
+                    if ('false' === $test) {
+                        $to = \trim($to) . '!1';
+                    } else if ('null' === $test) {
+                        $to .= $test;
+                    } else if ('true' === $test) {
+                        $to = \trim($to) . '!0';
+                    } else {
+                        $to .= $v[1];
+                    }
+                    continue;
+                }
+                // <https://stackoverflow.com/a/16606419/1163000>
+                if (\T_VARIABLE === $v[0]) {
+                    if ('(bool)' === \substr($to, -6)) {
+                        $to = \substr($to, 0, -6) . '!!' . $v[1];
+                    } else if ('(float)' === \substr($to, -7)) {
+                        $to = \substr($to, 0, -7) . $v[1] . '+0';
+                    } else if ('(int)' === \substr($to, -5)) {
+                        $to = \substr($to, 0, -5) . $v[1] . '+0';
+                    } else if ('(string)' === \substr($to, -8)) {
+                        $to = \substr($to, 0, -8) . $v[1] . '.""';
+                    } else if ("\x1a" === \substr($to, -1)) {
+                        $to = \substr($to, 0, -1) . $v[1];
+                    } else {
+                        if ('<?php ' === \substr($to, -6)) {
+                            $to .= $v[1];
+                        } else {
+                            $to = \trim($to) . $v[1];
+                        }
+                    }
                     continue;
                 }
                 if (\T_WHITESPACE === $v[0]) {
-                    if ("" === $next || "" === $prev) {
-                        continue;
-                    }
-                    if (' ' === \substr($out, -1)) {
-                        continue; // Has been followed by single space, skip!
-                    }
-                    // Check if previous or next token contains only punctuation mark(s). White-space around this
-                    // token usually safe to be removed. They must be PHP operator(s) like `&&` and `||`.
-                    // Of course, they can also be present in comment and string, but we already filtered them.
-                    if (
-                        (\function_exists("\\ctype_punct") && \ctype_punct($next) || \preg_match('/^\p{P}$/', $next)) ||
-                        (\function_exists("\\ctype_punct") && \ctype_punct($prev) || \preg_match('/^\p{P}$/', $prev))
-                    ) {
-                        // `$_` variable is all punctuation but it needs to be preceded by a space to
-                        // ensure that we don’t experience a result like `static$_=1` in the output.
-                        if ('$' === $next[0] && (\function_exists("\\ctype_alnum") && \ctype_alnum(\strtr($prev, ['_' => ""])) || \preg_match('/^\w+$/', $prev))) {
-                            $out .= ' ';
-                            continue;
-                        }
-                        // `_` is a punctuation but it needs to be preceded by a space to ensure that we
-                        // don’t experience a result like `function_(){}` or `const_=1` in the output.
-                        if ('_' === $next[0]) {
-                            $out .= ' ';
-                            continue;
-                        }
-                        continue;
-                    }
-                    // Check if previous or next token is a comment, then remove white-space around it!
-                    if (
-                        0 === \strpos($next, '#') ||
-                        0 === \strpos($prev, '#') ||
-                        0 === \strpos($next, '//') ||
-                        0 === \strpos($prev, '//') ||
-                        '/*' === \substr($next, 0, 2) && '*/' === \substr($next, -2) ||
-                        '/*' === \substr($prev, 0, 2) && '*/' === \substr($prev, -2)
-                    ) {
-                        continue;
-                    }
-                    // Remove white-space after type cast
-                    if (0 === \strpos($prev, '(') && ')' === \substr($prev, -1) && \preg_match('/^\(\s*[^()\s]+\s*\)$/', $prev)) {
-                        continue;
-                    }
-                    // Remove white-space after short echo
-                    if ('<?=' === \substr($out, -3)) {
-                        continue;
-                    }
-                    // Convert multiple white-space to single space
-                    $out .= ' ';
+                    $to .= false !== \strpos(' "/!#%&()*+,-.:;<=>?@[\]^`{|}~' . "'", \substr($to, -1)) ? "" : ' ';
+                    continue;
                 }
-                $out .= ("" === \trim($v[1]) ? "" : $v[1]);
+                // Math operator(s)
+                if (false !== \strpos('!%&*+-./<=>?|~', $v[1][0])) {
+                    $to = \trim($to) . $v[1];
+                    continue;
+                }
+                $to .= $v[1];
                 continue;
             }
-            // Replace `-0` with `0`
-            if ('-' === $v && '0' === $next) {
+            if ($is_array && '(' === $v) {
+                $in_array += 1;
+                $to = \trim($to) . '[';
                 continue;
             }
-            // Remove trailing `,`
-            if (',' === \substr($out, -1) && false !== \strpos(')]}', $v)) {
-                $out = \substr($out, 0, -1);
-            }
-            if (
-                'case ' === \substr($out, -5) ||
-                'echo ' === \substr($out, -5) ||
-                'return ' === \substr($out, -7) ||
-                'yield ' === \substr($out, -6)
-            ) {
-                if ($v && false !== \strpos('!([', $v[0])) {
-                    $out = \substr($out, 0, -1);
+            if ($is_array && ')' === $v) {
+                if ($in_array === $is_array) {
+                    $in_array -= 1;
+                    $is_array -= 1;
+                    $to = \trim(\trim($to, ',')) . ']';
+                    continue;
                 }
             }
-            $out .= ("" === \trim($v) ? "" : $v);
+            if (false !== \strpos('([', $v)) {
+                $to = \trim($to) . $v;
+                continue;
+            }
+            if (false !== \strpos(')]', $v)) {
+                // `new stdclass()` to `(object)[]()` to `(object)[]`
+                if ('(object)[](' === \substr($to, -11)) {
+                    $to = \substr($to, 0, -1);
+                    continue;
+                }
+                $to = \trim(\trim($to, ',')) . $v;
+                continue;
+            }
+            $to = \trim($to) . $v;
         }
-        return $out;
+        return "" !== ($to = \trim(\strtr($to, ["\x1a" => ""]))) ? $to : null;
     }
     public function activate(Composer $composer, IOInterface $io) {
         $composer->getInstallationManager()->addInstaller($this->installer = new Installer($io, $composer));
